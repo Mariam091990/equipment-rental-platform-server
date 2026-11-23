@@ -135,13 +135,129 @@ const verifyCustomer = (req, res, next) => {
     next();
 };
 
-// 4. Fetch all documents form mongodb and send them to the server side
-// Get all users
+// verify admin role 
 
-app.get('/users', async (req, res) => {
-    // search from mongodatabase for all user
-    const result = await users.find({}).toArray();
-    res.send(result);
+// Verify admin role
+const verifyAdmin = (req, res, next) => {
+    if (req.user?.role !== "admin") {
+        return res.status(403).send({
+            success: false,
+            message: "Access denied! Only admins are allowed.",
+        });
+    }
+
+    next();
+};
+
+
+// 4. Fetch all documents form mongodb and send them to the server side
+// Get all registered users (Admin only)
+app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const result = await users
+            .find(
+                {},
+                {
+                    projection: {
+                        name: 1,
+                        email: 1,
+                        role: 1,
+                        createdAt: 1,
+                        image: 1,
+                    },
+                }
+            )
+            .sort({ createdAt: -1 })
+            .toArray();
+
+        res.status(200).send({
+            success: true,
+            count: result.length,
+            users: result,
+        });
+
+    } catch (error) {
+        console.error("Fetch all users error:", error);
+
+        res.status(500).send({
+            success: false,
+            message: "Failed to fetch users.",
+        });
+    }
+});
+
+// Update user information and role (Admin only)
+app.put("/admin/users/:id", verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, image, phone, address, role } = req.body;
+
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).send({
+                success: false,
+                message: "Invalid user ID.",
+            });
+        }
+
+        const validRoles = ["customer", "owner", "admin"];
+
+        if (role && !validRoles.includes(role.toLowerCase())) {
+            return res.status(400).send({
+                success: false,
+                message: "Invalid user role.",
+            });
+        }
+
+        if (name !== undefined && (typeof name !== "string" || !name.trim())) {
+            return res.status(400).send({
+                success: false,
+                message: "Please provide a valid name.",
+            });
+        }
+
+        const updatedData = {
+            updatedAt: new Date(),
+        };
+
+        if (name !== undefined) updatedData.name = name.trim();
+        if (image !== undefined) updatedData.image = image.trim();
+        if (phone !== undefined) updatedData.phone = phone.trim();
+        if (address !== undefined) updatedData.address = address.trim();
+        if (role !== undefined) updatedData.role = role.toLowerCase();
+
+        // Prevent an admin from accidentally removing their own admin role
+        if (id === req.user.sub && role && role.toLowerCase() !== "admin") {
+            return res.status(400).send({
+                success: false,
+                message: "You cannot remove your own admin role.",
+            });
+        }
+
+        const result = await users.updateOne(
+            { _id: new ObjectId(id) },
+            { $set: updatedData }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).send({
+                success: false,
+                message: "User not found.",
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: "User information updated successfully.",
+        });
+
+    } catch (error) {
+        console.error("Update user error:", error);
+
+        res.status(500).send({
+            success: false,
+            message: "Failed to update user information.",
+        });
+    }
 });
 
 app.get('/', (req, res) => {
