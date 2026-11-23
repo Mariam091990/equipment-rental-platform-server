@@ -147,6 +147,32 @@ const verifyAdmin = (req, res, next) => {
     next();
 };
 
+// Admin: Get all customer rentals
+app.get( "/admin/all-rentals",
+    verifyToken,
+    verifyAdmin,
+    async (req, res) => {
+        try {
+            const rentals = await bookingsCollection
+                .find({})
+                .sort({ createdAt: -1 })
+                .toArray();
+
+            res.status(200).send({
+                success: true,
+                count: rentals.length,
+                rentals,
+            });
+        } catch (error) {
+            console.error("Admin fetch all rentals error:", error);
+
+            res.status(500).send({
+                success: false,
+                message: "Failed to fetch all rentals.",
+            });
+        }
+    }
+);
 
 // 4. Fetch all documents form mongodb and send them to the server side
 // Get all registered users (Admin only)
@@ -531,6 +557,30 @@ app.post('/equipment', verifyToken, verifyOwner, async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Failed to add equipment."
+        });
+    }
+});
+
+// Get 6 latest approved equipment for homepage
+app.get("/featured-equipment", async (req, res) => {
+    try {
+        const result = await equipment
+            .find({ status: "Approved" })
+            .sort({ createdAt: -1 })
+            .limit(6)
+            .toArray();
+
+        res.status(200).send({
+            success: true,
+            count: result.length,
+            equipment: result,
+        });
+    } catch (error) {
+        console.error("Featured equipment error:", error);
+
+        res.status(500).send({
+            success: false,
+            message: "Failed to fetch featured equipment.",
         });
     }
 });
