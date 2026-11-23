@@ -535,6 +535,46 @@ app.post('/equipment', verifyToken, verifyOwner, async (req, res) => {
     }
 });
 
+
+// Get single approved equipment by ID
+app.get("/equipment/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).send({
+                success: false,
+                message: "Invalid equipment ID.",
+            });
+        }
+
+        const result = await equipment.findOne({
+            _id: new ObjectId(id),
+            status: "Approved",
+        });
+
+        if (!result) {
+            return res.status(404).send({
+                success: false,
+                message: "Equipment not found.",
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            equipment: result,
+        });
+    } catch (error) {
+        console.error("Fetch equipment details error:", error);
+
+        res.status(500).send({
+            success: false,
+            message: "Failed to fetch equipment details.",
+        });
+    }
+});
+
+
 //....... Get equipment added by the currently logged-in owner
 app.get('/owner/equipment', verifyToken, verifyOwner, async (req, res) => {
     try {
