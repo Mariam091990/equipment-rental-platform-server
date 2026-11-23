@@ -295,6 +295,54 @@ app.get('/bookings', async (req, res) => {
 });
 
 
+// Get rentals belonging to the currently logged-in customer
+app.get("/customer/my-rentals",verifyToken, verifyCustomer, async (req, res) => {
+        try {
+            // Validate customer ID from JWT
+            if (!ObjectId.isValid(req.user.sub)) {
+                return res.status(400).send({
+                    success: false,
+                    message: "Invalid customer ID.",
+                });
+            }
+
+            // Find the authenticated customer
+            const customer = await users.findOne(
+                { _id: new ObjectId(req.user.sub) },
+                { projection: { email: 1 } }
+            );
+
+            if (!customer?.email) {
+                return res.status(404).send({
+                    success: false,
+                    message: "Customer not found.",
+                });
+            }
+
+            // Fetch only this customer's bookings
+            const result = await bookingsCollection
+                .find({ userEmail: customer.email })
+                .sort({ createdAt: -1 })
+                .toArray();
+
+            res.status(200).send({
+                success: true,
+                count: result.length,
+                rentals: result,
+            });
+
+        } catch (error) {
+            console.error("Fetch customer rentals error:", error);
+
+            res.status(500).send({
+                success: false,
+                message: "Failed to fetch your rentals.",
+            });
+        }
+    }
+);
+
+
 app.post('/equipment', verifyToken, verifyOwner, async (req, res) => {
     try {
         const {
