@@ -68,9 +68,9 @@ const connectedClient = await connectToDatabase();
 const db = connectedClient.db(`${process.env.DB_NAME}`);
 
 // 3. Select the collection of registered users
- const users = db.collection("user");
+const users = db.collection("user");
 export const equipment = db.collection("equipment");
- const favoritesCollection = db.collection("favorites");
+const favoritesCollection = db.collection("favorites");
 export const bookingsCollection = db.collection("bookings");
 
 // ----------------------------*****-----------------------
@@ -148,7 +148,7 @@ const verifyAdmin = (req, res, next) => {
 };
 
 // Admin: Get all customer rentals
-app.get( "/admin/all-rentals",
+app.get("/admin/all-rentals",
     verifyToken,
     verifyAdmin,
     async (req, res) => {
@@ -300,6 +300,57 @@ app.get('/owner-check', verifyToken, verifyOwner, (req, res) => {
     });
 });
 
+
+app.get("/trusted-owners", async (req, res) => {
+    try {
+        const owners = await equipment.aggregate([
+            {
+                $match: {
+                    status: "Approved",
+                    "owner.userId": { $exists: true, $ne: null },
+                },
+            },
+            {
+                $group: {
+                    _id: "$owner.userId",
+                    ownerName: {
+                        $first: {
+                            $ifNull: ["$owner.name", "Equipment Owner"],
+                        },
+                    },
+                    equipmentCount: { $sum: 1 },
+                    categories: { $addToSet: "$category" },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    ownerId: "$_id",
+                    ownerName: 1,
+                    equipmentCount: 1,
+                    categories: 1,
+                },
+            },
+            { $sort: { equipmentCount: -1 } },
+            { $limit: 6 },
+        ]).toArray();
+
+        res.status(200).send({
+            success: true,
+            count: owners.length,
+            owners,
+        });
+    } catch (error) {
+        console.error("Trusted owners error:", error);
+        res.status(500).send({
+            success: false,
+            message: "Failed to fetch equipment owners.",
+        });
+    }
+});
+
+
+
 // app.get('/equipment', async (req, res) => {
 //     try {
 //         const result = await equipment.find({}).toArray();
@@ -322,50 +373,50 @@ app.get('/bookings', async (req, res) => {
 
 
 // Get rentals belonging to the currently logged-in customer
-app.get("/customer/my-rentals",verifyToken, verifyCustomer, async (req, res) => {
-        try {
-            // Validate customer ID from JWT
-            if (!ObjectId.isValid(req.user.sub)) {
-                return res.status(400).send({
-                    success: false,
-                    message: "Invalid customer ID.",
-                });
-            }
-
-            // Find the authenticated customer
-            const customer = await users.findOne(
-                { _id: new ObjectId(req.user.sub) },
-                { projection: { email: 1 } }
-            );
-
-            if (!customer?.email) {
-                return res.status(404).send({
-                    success: false,
-                    message: "Customer not found.",
-                });
-            }
-
-            // Fetch only this customer's bookings
-            const result = await bookingsCollection
-                .find({ userEmail: customer.email })
-                .sort({ createdAt: -1 })
-                .toArray();
-
-            res.status(200).send({
-                success: true,
-                count: result.length,
-                rentals: result,
-            });
-
-        } catch (error) {
-            console.error("Fetch customer rentals error:", error);
-
-            res.status(500).send({
+app.get("/customer/my-rentals", verifyToken, verifyCustomer, async (req, res) => {
+    try {
+        // Validate customer ID from JWT
+        if (!ObjectId.isValid(req.user.sub)) {
+            return res.status(400).send({
                 success: false,
-                message: "Failed to fetch your rentals.",
+                message: "Invalid customer ID.",
             });
         }
+
+        // Find the authenticated customer
+        const customer = await users.findOne(
+            { _id: new ObjectId(req.user.sub) },
+            { projection: { email: 1 } }
+        );
+
+        if (!customer?.email) {
+            return res.status(404).send({
+                success: false,
+                message: "Customer not found.",
+            });
+        }
+
+        // Fetch only this customer's bookings
+        const result = await bookingsCollection
+            .find({ userEmail: customer.email })
+            .sort({ createdAt: -1 })
+            .toArray();
+
+        res.status(200).send({
+            success: true,
+            count: result.length,
+            rentals: result,
+        });
+
+    } catch (error) {
+        console.error("Fetch customer rentals error:", error);
+
+        res.status(500).send({
+            success: false,
+            message: "Failed to fetch your rentals.",
+        });
     }
+}
 );
 
 
