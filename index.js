@@ -862,6 +862,49 @@ app.put("/admin/equipment/:id", verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
+// Delete any equipment (Admin only)
+app.delete(
+    "/admin/equipment/:id",
+    verifyToken,
+    verifyAdmin,
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            if (!ObjectId.isValid(id)) {
+                return res.status(400).send({
+                    success: false,
+                    message: "Invalid equipment ID.",
+                });
+            }
+
+            const result = await equipment.deleteOne({
+                _id: new ObjectId(id),
+            });
+
+            if (result.deletedCount === 0) {
+                return res.status(404).send({
+                    success: false,
+                    message: "Equipment not found.",
+                });
+            }
+
+            res.status(200).send({
+                success: true,
+                message: "Equipment deleted successfully.",
+            });
+        } catch (error) {
+            console.error("Admin delete equipment error:", error);
+
+            res.status(500).send({
+                success: false,
+                message: "Failed to delete equipment.",
+            });
+        }
+    }
+);
+
+
 
 
 
