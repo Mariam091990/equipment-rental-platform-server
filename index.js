@@ -942,6 +942,60 @@ app.put("/owner/profile", verifyToken, verifyOwner, async (req, res) => {
     }
 });
 
+app.get("/customer/profile", verifyToken,  async (req, res) => {
+    try {
+        if (!ObjectId.isValid(req.user.sub)) {
+            return res.status(400).send({
+                success: false,
+                message: "Invalid user ID.",
+            });
+        }
+
+        const customer = await users.findOne(
+            { _id: new ObjectId(req.user.sub) },
+            {
+                projection: {
+                    name: 1,
+                    email: 1,
+                    image: 1,
+                    phone: 1,
+                    address: 1,
+                    createdAt: 1,
+                    role: 1,
+                },
+            }
+        );
+
+        if (!customer) {
+            return res.status(404).send({
+                success: false,
+                message: "Customer profile not found.",
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            profile: {
+                name: customer.name || "",
+                email: customer.email || req.user.email || "",
+                image: customer.image || "",
+                phone: customer.phone || "",
+                address: customer.address || "",
+                createdAt: customer.createdAt || null,
+                role: customer.role || "customer",
+            },
+        });
+    } catch (error) {
+        console.error("Get customer profile error:", error);
+        res.status(500).send({
+            success: false,
+            message: "Failed to load customer profile.",
+        });
+    }
+});
+
+
+
 // Get all equipment (Admin only)
 app.get("/admin/equipment", verifyToken, verifyAdmin, async (req, res) => {
     try {
