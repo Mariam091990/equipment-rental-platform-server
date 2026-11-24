@@ -700,6 +700,38 @@ app.get('/owner/equipment', verifyToken, verifyOwner, async (req, res) => {
     }
 });
 
+
+// Get rentals for equipment belonging to the logged-in owner
+app.get( "/owner/my-equipment-rentals", verifyToken, verifyOwner,
+    async (req, res) => {
+        try {
+            // Get only this owner's bookings
+            const rentals = await bookingsCollection
+                .find({
+                    "owner.userId": req.user.sub,
+                })
+                .sort({ createdAt: -1 })
+                .toArray();
+
+            return res.status(200).send({
+                success: true,
+                count: rentals.length,
+                rentals,
+            });
+
+        } catch (error) {
+            console.error("Fetch owner equipment rentals error:", error);
+
+            return res.status(500).send({
+                success: false,
+                message: "Failed to fetch your equipment rentals.",
+            });
+        }
+    }
+);
+
+
+
 // ........update equipment by owner--------
 app.put("/owner/equipment/:id", verifyToken, verifyOwner, async (req, res) => {
     try {
